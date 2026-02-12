@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Hack-Do
+Comment=A Matrix-themed task manager
+Exec=/usr/bin/hack-do
+Icon=utilities-terminal
+Categories=Utility;
+Terminal=false
