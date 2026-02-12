@@ -1,16 +1,45 @@
-# hack_do
+# hack-do
 
-A new Flutter project.
+A matrix-themed task manager built with Flutter. Features vi-keybind text editing, time tracking, and peer-to-peer task syncing across devices on your local network.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- **Diagonal & tiling layouts** — view tasks stacked in a 4-quadrant card deck or a responsive grid
+- **Vi-mode text editor** — write progress notes with normal/insert modes, motions (`hjkl`, `w`, `b`, `gg`, `dd`), yank/paste
+- **Time tracking** — per-task play/pause/reset timer with cumulative elapsed time
+- **Markdown progress notes** — write and preview markdown in task descriptions
+- **Priority & color coding** — low/medium/high priority badges, 6 card color themes
+- **Filters** — cycle between all / ongoing / done views
+- **Local network sync** — discover and sync tasks with other hack-do instances on the same LAN, LocalSend-style
 
-A few resources to get you started if this is your first Flutter project:
+## Sync
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+hack-do includes peer-to-peer task syncing with zero configuration:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- **Auto-discovery** — UDP broadcast finds other hack-do instances on your local network
+- **Tap to sync** — open the sync screen to see nearby devices on an animated radar, tap any device to sync
+- **Conflict resolution** — last-modified-wins merge strategy with soft-delete propagation
+- **No server required** — each instance runs an embedded HTTP server, all communication stays on your LAN
+
+## Building
+
+```sh
+flutter pub get
+flutter run
+```
+
+### Arch Linux
+
+```sh
+makepkg -si
+```
+
+## Tech
+
+- Flutter + Dart
+- Hive (local NoSQL storage)
+- `dart:io` for all networking (HTTP server, UDP broadcast) — no external network dependencies
+
+## License
+
+GPL-3.0
