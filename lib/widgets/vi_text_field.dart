@@ -22,7 +22,7 @@ class _ViTextFieldState extends State<ViTextField> {
   ViMode _mode = ViMode.insert;
   String? _pendingKey;
   String _yankBuffer = '';
-  final FocusNode _focusNode = FocusNode();
+  late final FocusNode _focusNode;
   final List<_UndoEntry> _undoStack = [];
 
   TextEditingController get _ctrl => widget.controller;
@@ -30,6 +30,7 @@ class _ViTextFieldState extends State<ViTextField> {
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
     _pushUndo();
   }
 
@@ -249,12 +250,15 @@ class _ViTextFieldState extends State<ViTextField> {
     }
 
     // Normal mode
-    final key = event.logicalKey;
     final char = event.character;
 
     // Handle two-key combos
     if (_pendingKey != null) {
-      final combo = _pendingKey! + (char ?? '');
+      if (char == null) {
+        // Ignore non-character keys (modifiers, etc.) while pending
+        return KeyEventResult.handled;
+      }
+      final combo = _pendingKey! + char;
       _pendingKey = null;
       setState(() {});
       switch (combo) {
@@ -336,14 +340,9 @@ class _ViTextFieldState extends State<ViTextField> {
         return KeyEventResult.handled;
     }
 
-    // Intercept all other keys in normal mode to prevent typing
-    if (key != LogicalKeyboardKey.tab &&
-        key != LogicalKeyboardKey.enter &&
-        char != null) {
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.handled;
+    // Block unrecognized character keys in normal mode, but let
+    // special keys (arrows, modifiers, etc.) pass through
+    return char != null ? KeyEventResult.handled : KeyEventResult.ignored;
   }
 
   @override
@@ -351,34 +350,32 @@ class _ViTextFieldState extends State<ViTextField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Focus(
-          onKeyEvent: _handleKeyEvent,
-          child: TextField(
-            controller: _ctrl,
-            focusNode: _focusNode,
-            style: const TextStyle(
-              color: MatrixTheme.primaryGreen,
-              fontFamily: 'monospace',
-              fontSize: 14,
+        TextField(
+          controller: _ctrl,
+          focusNode: _focusNode,
+          readOnly: _mode == ViMode.normal,
+          style: const TextStyle(
+            color: MatrixTheme.primaryGreen,
+            fontFamily: 'monospace',
+            fontSize: 14,
+          ),
+          cursorColor: MatrixTheme.primaryGreen,
+          cursorWidth: _mode == ViMode.normal ? 8 : 2,
+          maxLines: widget.maxLines,
+          minLines: widget.maxLines,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: MatrixTheme.background,
+            contentPadding: const EdgeInsets.all(12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: MatrixTheme.primaryGreen.withValues(alpha: 0.3),
+              ),
             ),
-            cursorColor: MatrixTheme.primaryGreen,
-            cursorWidth: _mode == ViMode.normal ? 8 : 2,
-            maxLines: widget.maxLines,
-            minLines: widget.maxLines,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: MatrixTheme.background,
-              contentPadding: const EdgeInsets.all(12),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: MatrixTheme.primaryGreen.withValues(alpha: 0.3),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: MatrixTheme.primaryGreen),
-              ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: MatrixTheme.primaryGreen),
             ),
           ),
         ),

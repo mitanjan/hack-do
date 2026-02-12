@@ -19,7 +19,7 @@ class _TaskInputDialogState extends State<TaskInputDialog> {
   late TextEditingController _progressController;
   Priority _priority = Priority.medium;
   DateTime? _dueDate;
-  bool _showPreview = true;
+  late bool _showPreview = widget.existingTask != null;
 
   bool get _isEditing => widget.existingTask != null;
 
