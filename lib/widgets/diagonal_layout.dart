@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../models/task.dart';
+import '../utils/platform_info.dart' as platform_info;
 import 'task_card.dart';
 
 class DiagonalLayout extends StatefulWidget {
@@ -41,7 +42,7 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
   static const double _refWidth = 1500.0;
   static const double _refHeight = 800.0;
   static const double _refCardWidth = 240.0;
-  static const double _refCardHeight = 310.0;
+  static const double _refCardHeight = 300.0;
   static const double _refPeekAmount = 60.0;
   static const double _refPeekUp = 50.0;
   static const double _refGapX = 115.0;
@@ -121,7 +122,7 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
         final scale = min(
           constraints.maxWidth / refW,
           constraints.maxHeight / refH,
-        ).clamp(isMobile ? 0.6 : 0.4, 1.3);
+        ).clamp(isMobile ? 0.6 : 0.4, isMobile ? 1.0 : 0.85);
 
         // Mobile uses smaller base card to fit the screen
         final baseCardW = isMobile ? 180.0 : _refCardWidth;
@@ -297,21 +298,20 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
     return centerY + _dySign[quadrant] * (d.gapY + depth * d.peekV);
   }
 
+  void _toggleReveal(Task task) {
+    setState(() {
+      _revealedTaskId = _revealedTaskId == task.id ? null : task.id;
+    });
+  }
+
   Widget _taskCardWidget(Task task, double scale) {
     return GestureDetector(
-      onSecondaryTap: () {
-        setState(() {
-          _revealedTaskId = _revealedTaskId == task.id ? null : task.id;
-        });
-      },
-      onDoubleTap: () {
-        setState(() {
-          _revealedTaskId = _revealedTaskId == task.id ? null : task.id;
-        });
-      },
+      onSecondaryTap: () => _toggleReveal(task),
+      onDoubleTap: () => _toggleReveal(task),
       child: TaskCard(
         task: task,
         scale: scale,
+        compact: platform_info.isAndroid,
         tickStream: widget.tickStream,
         onTap: () {
           setState(() => _revealedTaskId = task.id);

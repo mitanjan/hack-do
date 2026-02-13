@@ -69,7 +69,7 @@ class _TaskInputDialogState extends State<TaskInputDialog> {
         );
       },
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _dueDate = picked);
     }
   }

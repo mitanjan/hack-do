@@ -61,7 +61,7 @@ class TaskService {
     }
   }
 
-  void toggleOngoing(String id) {
+  Future<void> toggleOngoing(String id) async {
     final task = _box.get(id);
     if (task == null) return;
     if (task.isOngoing) {
@@ -76,17 +76,17 @@ class TaskService {
       task.ongoingStartTime = DateTime.now();
     }
     task.lastModifiedAt = DateTime.now();
-    task.save();
+    await task.save();
   }
 
-  void resetTimer(String id) {
+  Future<void> resetTimer(String id) async {
     final task = _box.get(id);
     if (task == null) return;
     task.isOngoing = false;
     task.ongoingStartTime = null;
     task.elapsedSeconds = 0;
     task.lastModifiedAt = DateTime.now();
-    task.save();
+    await task.save();
   }
 
   List<String> getDeletedIds() {

@@ -23,8 +23,8 @@ void main() async {
   );
   try {
     await syncService.start();
-  } catch (_) {
-    // Sync may fail on platforms with restricted networking — app still works
+  } catch (e) {
+    debugPrint('SyncService: start failed: $e');
   }
 
   runApp(HackDoApp(taskService: taskService, syncService: syncService));

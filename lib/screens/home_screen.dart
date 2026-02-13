@@ -12,6 +12,20 @@ import 'sync_screen.dart';
 
 enum TaskFilter { all, ongoing, done }
 
+extension TaskFilterInfo on TaskFilter {
+  String get label => switch (this) {
+        TaskFilter.all => 'ALL',
+        TaskFilter.ongoing => 'ONGOING',
+        TaskFilter.done => 'DONE',
+      };
+
+  IconData get icon => switch (this) {
+        TaskFilter.all => Icons.all_inclusive,
+        TaskFilter.ongoing => Icons.play_circle_outline,
+        TaskFilter.done => Icons.check_circle_outline,
+      };
+}
+
 class HomeScreen extends StatefulWidget {
   final TaskService taskService;
   final SyncService syncService;
@@ -163,66 +177,37 @@ class _HomeScreenState extends State<HomeScreen> {
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('DELETE',
-                style: TextStyle(color: Color(0xFFFF4136))),
+                style: TextStyle(color: MatrixTheme.errorRed)),
           ),
         ],
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       await widget.taskService.delete(task.id);
       _loadTasks();
     }
   }
 
-  void _toggleComplete(Task task) async {
+  Future<void> _toggleComplete(Task task) async {
     await widget.taskService.toggleComplete(task.id);
     _loadTasks();
   }
 
-  void _toggleOngoing(Task task) {
-    widget.taskService.toggleOngoing(task.id);
+  Future<void> _toggleOngoing(Task task) async {
+    await widget.taskService.toggleOngoing(task.id);
     _loadTasks();
   }
 
-  void _resetTimer(Task task) {
-    widget.taskService.resetTimer(task.id);
+  Future<void> _resetTimer(Task task) async {
+    await widget.taskService.resetTimer(task.id);
     _loadTasks();
   }
 
   void _cycleFilter() {
     setState(() {
-      switch (_filter) {
-        case TaskFilter.all:
-          _filter = TaskFilter.ongoing;
-        case TaskFilter.ongoing:
-          _filter = TaskFilter.done;
-        case TaskFilter.done:
-          _filter = TaskFilter.all;
-      }
+      _filter = TaskFilter.values[(_filter.index + 1) % TaskFilter.values.length];
     });
-  }
-
-  String get _filterLabel {
-    switch (_filter) {
-      case TaskFilter.all:
-        return 'ALL';
-      case TaskFilter.ongoing:
-        return 'ONGOING';
-      case TaskFilter.done:
-        return 'DONE';
-    }
-  }
-
-  IconData get _filterIcon {
-    switch (_filter) {
-      case TaskFilter.all:
-        return Icons.all_inclusive;
-      case TaskFilter.ongoing:
-        return Icons.play_circle_outline;
-      case TaskFilter.done:
-        return Icons.check_circle_outline;
-    }
   }
 
   @override
@@ -250,10 +235,10 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(_filterIcon, size: 16, color: MatrixTheme.primaryGreen),
+                Icon(_filter.icon, size: 16, color: MatrixTheme.primaryGreen),
                 const SizedBox(width: 6),
                 Text(
-                  _filterLabel,
+                  _filter.label,
                   style: TextStyle(
                     color: MatrixTheme.primaryGreen,
                     fontSize: 13,
@@ -334,12 +319,12 @@ class _SyncButtonState extends State<_SyncButton> {
   void initState() {
     super.initState();
     _peerCount = widget.syncService.peers.length;
-    widget.syncService.addPeersChangedListener(_onPeersChanged);
+    widget.syncService.addListener(_onPeersChanged);
   }
 
   @override
   void dispose() {
-    widget.syncService.removePeersChangedListener(_onPeersChanged);
+    widget.syncService.removeListener(_onPeersChanged);
     super.dispose();
   }
 

@@ -7,6 +7,7 @@ class MatrixTheme {
   static const Color dimGreen = Color(0xFF00994D);
   static const Color darkGreen = Color(0xFF003B00);
   static const Color surfaceColor = Color(0xFF0A1A0F);
+  static const Color errorRed = Color(0xFFFF4136);
 
   static const List<Color> cardColors = [
     Color(0xFF0A2E2A), // dark teal

@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart' show Color;
 import 'package:hive/hive.dart';
+import '../theme/matrix_theme.dart';
 
 part 'task.g.dart';
 
@@ -10,6 +12,20 @@ enum Priority {
   medium,
   @HiveField(2)
   high,
+}
+
+extension PriorityInfo on Priority {
+  String get label => switch (this) {
+        Priority.low => 'LOW',
+        Priority.medium => 'MED',
+        Priority.high => 'HIGH',
+      };
+
+  Color get color => switch (this) {
+        Priority.low => MatrixTheme.dimGreen,
+        Priority.medium => MatrixTheme.primaryGreen,
+        Priority.high => MatrixTheme.errorRed,
+      };
 }
 
 @HiveType(typeId: 1)

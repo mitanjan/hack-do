@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../utils/platform_info.dart' as platform_info;
 import 'task_service.dart';
 
 class Peer {
@@ -39,14 +41,15 @@ class SyncResult {
         success = false;
 }
 
-class SyncService {
+class SyncService with ChangeNotifier {
   final TaskService _taskService;
   final String deviceName;
 
   HttpServer? _httpServer;
   RawDatagramSocket? _udpSocket;
+  StreamSubscription<RawSocketEvent>? _udpSubscription;
   Timer? _maintainTimer;
-  late final HttpClient _httpClient;
+  HttpClient? _httpClient;
 
   final Map<String, Peer> _peers = {};
   int _httpPort = 0;
@@ -56,25 +59,8 @@ class SyncService {
   static const Duration _peerTimeout = Duration(seconds: 15);
   static const String _magicPrefix = 'HACKDO';
 
-  final List<void Function()> _peersChangedListeners = [];
-
-  void addPeersChangedListener(void Function() listener) {
-    _peersChangedListeners.add(listener);
-  }
-
-  void removePeersChangedListener(void Function() listener) {
-    _peersChangedListeners.remove(listener);
-  }
-
-  void _notifyPeersChanged() {
-    for (final listener in _peersChangedListeners) {
-      listener();
-    }
-  }
-
   SyncService({required TaskService taskService, required this.deviceName})
-      : _taskService = taskService,
-        _httpClient = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      : _taskService = taskService;
 
   List<Peer> get peers => _peers.values.toList();
 
@@ -85,11 +71,14 @@ class SyncService {
   static const _multicastChannel = MethodChannel('com.hackdo/multicast');
 
   Future<void> start() async {
-    if (Platform.isAndroid) {
+    if (platform_info.isAndroid) {
       try {
         await _multicastChannel.invokeMethod('acquire');
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('SyncService: multicast acquire failed: $e');
+      }
     }
+    _httpClient = HttpClient()..connectionTimeout = const Duration(seconds: 5);
     await _cacheLocalIps();
     await _startHttpServer();
     await _startDiscovery();
@@ -97,15 +86,25 @@ class SyncService {
 
   Future<void> stop() async {
     _maintainTimer?.cancel();
-    _udpSocket?.close();
-    await _httpServer?.close();
-    _httpServer = null;
-    _udpSocket = null;
-    _peers.clear();
-    if (Platform.isAndroid) {
-      try {
-        await _multicastChannel.invokeMethod('release');
-      } catch (_) {}
+    _maintainTimer = null;
+    try {
+      await _udpSubscription?.cancel();
+      _udpSubscription = null;
+      _udpSocket?.close();
+      _udpSocket = null;
+      await _httpServer?.close();
+      _httpServer = null;
+      _httpClient?.close();
+      _httpClient = null;
+    } finally {
+      _peers.clear();
+      if (platform_info.isAndroid) {
+        try {
+          await _multicastChannel.invokeMethod('release');
+        } catch (e) {
+          debugPrint('SyncService: multicast release failed: $e');
+        }
+      }
     }
   }
 
@@ -189,8 +188,8 @@ class SyncService {
         reuseAddress: true,
         reusePort: true,
       );
-    } catch (_) {
-      // reusePort not supported on some platforms, fall back
+    } catch (e) {
+      debugPrint('SyncService: reusePort not supported, falling back: $e');
       _udpSocket = await RawDatagramSocket.bind(
         InternetAddress.anyIPv4,
         _udpPort,
@@ -199,7 +198,7 @@ class SyncService {
     }
     _udpSocket!.broadcastEnabled = true;
 
-    _udpSocket!.listen((event) {
+    _udpSubscription = _udpSocket!.listen((event) {
       if (event == RawSocketEvent.read) {
         final datagram = _udpSocket!.receive();
         if (datagram != null) {
@@ -253,7 +252,7 @@ class SyncService {
     );
 
     if (isNew) {
-      _notifyPeersChanged();
+      notifyListeners();
     }
   }
 
@@ -276,7 +275,9 @@ class SyncService {
           _localIps.add(addr.address);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('SyncService: failed to cache local IPs: $e');
+    }
   }
 
   void _pruneStalePeers() {
@@ -284,7 +285,7 @@ class SyncService {
     final sizeBefore = _peers.length;
     _peers.removeWhere((_, peer) => now.difference(peer.lastSeen) > _peerTimeout);
     if (_peers.length != sizeBefore) {
-      _notifyPeersChanged();
+      notifyListeners();
     }
   }
 
@@ -293,7 +294,7 @@ class SyncService {
   Future<SyncResult> syncWithPeer(Peer peer) async {
     try {
       // POST our tasks to the peer
-      final request = await _httpClient.post(peer.ip, peer.port, '/sync');
+      final request = await _httpClient!.post(peer.ip, peer.port, '/sync');
       request.headers.contentType = ContentType.json;
 
       final payload = {

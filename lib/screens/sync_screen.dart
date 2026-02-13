@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../services/sync_service.dart';
@@ -38,14 +37,14 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     )..repeat(reverse: true);
 
     _peers = widget.syncService.peers;
-    widget.syncService.addPeersChangedListener(_onPeersChanged);
+    widget.syncService.addListener(_onPeersChanged);
   }
 
   @override
   void dispose() {
     _radarController.dispose();
     _pulseController.dispose();
-    widget.syncService.removePeersChangedListener(_onPeersChanged);
+    widget.syncService.removeListener(_onPeersChanged);
     super.dispose();
   }
 
@@ -73,9 +72,9 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
 
       if (result.success) {
         widget.onSyncComplete();
-        _showResultSnackBar(result);
+        _showSnackBar('SYNCED ${result.peerName}: +${result.added} new, ~${result.updated} updated');
       } else {
-        _showErrorSnackBar(result);
+        _showSnackBar('SYNC FAILED ${result.peerName}: ${result.error}', color: MatrixTheme.errorRed, durationSeconds: 3);
       }
 
       // Reset state after a delay
@@ -105,50 +104,23 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
       final totalUpdated = successes.fold<int>(0, (s, r) => s + r.updated);
       final failures = results.where((r) => !r.success).length;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: MatrixTheme.surfaceColor,
-          content: Text(
-            failures == 0
-                ? 'SYNC COMPLETE: +$totalAdded new, ~$totalUpdated updated'
-                : 'SYNC: +$totalAdded new, ~$totalUpdated updated, $failures failed',
-            style: TextStyle(
-              color: failures == 0
-                  ? MatrixTheme.primaryGreen
-                  : const Color(0xFFFF4136),
-              fontFamily: 'monospace',
-            ),
-          ),
-        ),
-      );
+      final message = failures == 0
+          ? 'SYNC COMPLETE: +$totalAdded new, ~$totalUpdated updated'
+          : 'SYNC: +$totalAdded new, ~$totalUpdated updated, $failures failed';
+      final color = failures == 0 ? MatrixTheme.primaryGreen : MatrixTheme.errorRed;
+      _showSnackBar(message, color: color);
     }
   }
 
-  void _showResultSnackBar(SyncResult result) {
+  void _showSnackBar(String message, {Color color = MatrixTheme.primaryGreen, int durationSeconds = 2}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: MatrixTheme.surfaceColor,
-        duration: const Duration(seconds: 2),
+        duration: Duration(seconds: durationSeconds),
         content: Text(
-          'SYNCED ${result.peerName}: +${result.added} new, ~${result.updated} updated',
-          style: const TextStyle(
-            color: MatrixTheme.primaryGreen,
-            fontFamily: 'monospace',
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showErrorSnackBar(SyncResult result) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: MatrixTheme.surfaceColor,
-        duration: const Duration(seconds: 3),
-        content: Text(
-          'SYNC FAILED ${result.peerName}: ${result.error}',
-          style: const TextStyle(
-            color: Color(0xFFFF4136),
+          message,
+          style: TextStyle(
+            color: color,
             fontFamily: 'monospace',
           ),
         ),
@@ -292,7 +264,7 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     final borderColor = isDone
         ? MatrixTheme.primaryGreen
         : isError
-            ? const Color(0xFFFF4136)
+            ? MatrixTheme.errorRed
             : isSyncing
                 ? MatrixTheme.primaryGreen.withValues(alpha: 0.6)
                 : MatrixTheme.primaryGreen.withValues(alpha: 0.2);
@@ -300,7 +272,7 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     final glowColor = isDone
         ? MatrixTheme.primaryGreen.withValues(alpha: 0.3)
         : isError
-            ? const Color(0xFFFF4136).withValues(alpha: 0.2)
+            ? MatrixTheme.errorRed.withValues(alpha: 0.2)
             : Colors.transparent;
 
     return GestureDetector(
