@@ -40,12 +40,12 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
   // Reference dimensions (tuned for ~1500×800 window)
   static const double _refWidth = 1500.0;
   static const double _refHeight = 800.0;
-  static const double _refCardWidth = 180.0;
-  static const double _refCardHeight = 230.0;
-  static const double _refPeekAmount = 55.0;
-  static const double _refPeekUp = 45.0;
-  static const double _refGapX = 95.0;
-  static const double _refGapY = 120.0;
+  static const double _refCardWidth = 240.0;
+  static const double _refCardHeight = 310.0;
+  static const double _refPeekAmount = 60.0;
+  static const double _refPeekUp = 50.0;
+  static const double _refGapX = 115.0;
+  static const double _refGapY = 145.0;
 
   static const double _swipeThreshold = 60.0;
   double _dragAccumulator = 0.0;
@@ -123,12 +123,20 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
           constraints.maxHeight / refH,
         ).clamp(isMobile ? 0.6 : 0.4, 1.3);
 
-        final cardW = _refCardWidth * scale;
-        final cardH = _refCardHeight * scale;
-        final peekH = _refPeekAmount * scale;
-        final peekV = _refPeekUp * scale;
-        final gapX = max(cardW / 2 + 10, _refGapX * scale);
-        final gapY = max(cardH / 2 + 10, _refGapY * scale);
+        // Mobile uses smaller base card to fit the screen
+        final baseCardW = isMobile ? 180.0 : _refCardWidth;
+        final baseCardH = isMobile ? 230.0 : _refCardHeight;
+        final basePeekH = isMobile ? 55.0 : _refPeekAmount;
+        final basePeekV = isMobile ? 45.0 : _refPeekUp;
+        final baseGapX = isMobile ? 95.0 : _refGapX;
+        final baseGapY = isMobile ? 120.0 : _refGapY;
+
+        final cardW = baseCardW * scale;
+        final cardH = baseCardH * scale;
+        final peekH = basePeekH * scale;
+        final peekV = basePeekV * scale;
+        final gapX = max(cardW / 2 + 10, baseGapX * scale);
+        final gapY = max(cardH / 2 + 10, baseGapY * scale);
 
         final centerX = (constraints.maxWidth - cardW) / 2;
         final centerY = (constraints.maxHeight - cardH) / 2;

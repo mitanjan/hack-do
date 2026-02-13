@@ -354,6 +354,7 @@ class _ViTextFieldState extends State<ViTextField> {
           controller: _ctrl,
           focusNode: _focusNode,
           readOnly: _mode == ViMode.normal,
+          showCursor: true,
           style: const TextStyle(
             color: MatrixTheme.primaryGreen,
             fontFamily: 'monospace',

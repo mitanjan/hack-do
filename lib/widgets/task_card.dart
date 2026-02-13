@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/task.dart';
 import '../theme/matrix_theme.dart';
 
@@ -11,6 +13,7 @@ class TaskCard extends StatelessWidget {
   final VoidCallback? onToggleOngoing;
   final VoidCallback? onResetTimer;
   final bool compact;
+  final bool showDescription;
   final double scale;
   final Stream<void>? tickStream;
 
@@ -23,6 +26,7 @@ class TaskCard extends StatelessWidget {
     this.onToggleOngoing,
     this.onResetTimer,
     this.compact = false,
+    this.showDescription = true,
     this.scale = 1.0,
     this.tickStream,
   });
@@ -98,7 +102,7 @@ class TaskCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: _cardColor,
-          borderRadius: BorderRadius.circular(_s(12, 10)),
+          borderRadius: BorderRadius.circular(_s(14, 10)),
           border: Border.all(
             color: task.isOngoing
                 ? MatrixTheme.primaryGreen.withValues(alpha: 0.5)
@@ -109,7 +113,7 @@ class TaskCard extends StatelessWidget {
               : (compact ? _idleShadowCompact : _idleShadow),
         ),
         child: Padding(
-          padding: EdgeInsets.all(_s(12, 8)),
+          padding: EdgeInsets.all(_s(16, 8)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -118,15 +122,15 @@ class TaskCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       task.title,
-                      style: TextStyle(
+                      style: GoogleFonts.shareTechMono(
                         color: MatrixTheme.primaryGreen,
-                        fontSize: _s(14, 12),
+                        fontSize: _s(18, 12),
                         fontWeight: FontWeight.bold,
                         decoration: task.isCompleted
                             ? TextDecoration.lineThrough
                             : null,
                         decorationColor: MatrixTheme.primaryGreen,
-                        shadows: MatrixTheme.glowShadow(blurRadius: _s(5, 3)),
+                        shadows: MatrixTheme.glowShadow(blurRadius: _s(6, 3)),
                       ),
                       maxLines: compact ? 1 : 2,
                       overflow: TextOverflow.ellipsis,
@@ -135,13 +139,13 @@ class TaskCard extends StatelessWidget {
                   GestureDetector(
                     onTap: onToggleComplete,
                     child: Container(
-                      width: _s(20, 16),
-                      height: _s(20, 16),
+                      width: _s(26, 16),
+                      height: _s(26, 16),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: MatrixTheme.primaryGreen,
-                          width: _s(2, 1.5),
+                          width: _s(2.5, 1.5),
                         ),
                         color: task.isCompleted
                             ? MatrixTheme.primaryGreen
@@ -149,70 +153,72 @@ class TaskCard extends StatelessWidget {
                       ),
                       child: task.isCompleted
                           ? Icon(Icons.check,
-                              size: _s(13, 10),
+                              size: _s(17, 10),
                               color: MatrixTheme.background)
                           : null,
                     ),
                   ),
-                  SizedBox(width: _s(8, 4)),
-                  GestureDetector(
-                    onTap: onDelete,
-                    child: Icon(
-                      Icons.close,
-                      size: _s(16, 14),
-                      color: const Color(0xFFFF4136).withValues(alpha: 0.7),
+                  if (!Platform.isAndroid) ...[
+                    SizedBox(width: _s(10, 4)),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: Icon(
+                        Icons.close,
+                        size: _s(20, 14),
+                        color: const Color(0xFFFF4136).withValues(alpha: 0.7),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
-              if (task.description.isNotEmpty && !compact) ...[
-                SizedBox(height: _s(8)),
+              if (task.description.isNotEmpty && !compact && showDescription) ...[
+                SizedBox(height: _s(10)),
                 Text(
                   task.description,
-                  style: TextStyle(
+                  style: GoogleFonts.shareTechMono(
                     color: MatrixTheme.primaryGreen.withValues(alpha: 0.7),
-                    fontSize: _s(11),
+                    fontSize: _s(14),
                   ),
-                  maxLines: 3,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              if (!compact) SizedBox(height: _s(8)),
+              if (!compact) SizedBox(height: _s(10)),
               if (compact) SizedBox(height: _s(4)),
               Row(
                 children: [
                   Container(
                     padding: EdgeInsets.symmetric(
-                      horizontal: _s(8, 4),
-                      vertical: _s(2, 1),
+                      horizontal: _s(10, 4),
+                      vertical: _s(3, 1),
                     ),
                     decoration: BoxDecoration(
                       border: Border.all(color: _priorityColor),
-                      borderRadius: BorderRadius.circular(_s(8, 4)),
+                      borderRadius: BorderRadius.circular(_s(10, 4)),
                     ),
                     child: Text(
                       _priorityLabel,
-                      style: TextStyle(
+                      style: GoogleFonts.shareTechMono(
                         color: _priorityColor,
-                        fontSize: _s(9, 7),
+                        fontSize: _s(11, 7),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   if (task.dueDate != null) ...[
-                    SizedBox(width: _s(8, 4)),
+                    SizedBox(width: _s(10, 4)),
                     Icon(Icons.schedule,
-                        size: _s(12, 10),
+                        size: _s(15, 10),
                         color:
                             MatrixTheme.primaryGreen.withValues(alpha: 0.6)),
-                    SizedBox(width: _s(4)),
+                    SizedBox(width: _s(5)),
                     if (!compact)
                       Text(
                         '${task.dueDate!.day}/${task.dueDate!.month}/${task.dueDate!.year}',
-                        style: TextStyle(
+                        style: GoogleFonts.shareTechMono(
                           color:
                               MatrixTheme.primaryGreen.withValues(alpha: 0.6),
-                          fontSize: _s(9),
+                          fontSize: _s(12),
                         ),
                       ),
                   ],
@@ -230,20 +236,20 @@ class TaskCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                SizedBox(height: _s(8, 4)),
+                SizedBox(height: _s(10, 4)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     GestureDetector(
                       onTap: onToggleOngoing,
                       child: Container(
-                        width: _s(30, 24),
-                        height: _s(30, 24),
+                        width: _s(38, 24),
+                        height: _s(38, 24),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: MatrixTheme.primaryGreen,
-                            width: _s(2, 1.5),
+                            width: _s(2.5, 1.5),
                           ),
                           color: task.isOngoing
                               ? MatrixTheme.primaryGreen.withValues(alpha: 0.2)
@@ -251,18 +257,18 @@ class TaskCard extends StatelessWidget {
                         ),
                         child: Icon(
                           task.isOngoing ? Icons.pause : Icons.play_arrow,
-                          size: _s(16, 14),
+                          size: _s(20, 14),
                           color: MatrixTheme.primaryGreen,
                         ),
                       ),
                     ),
                     if (task.totalElapsedSeconds > 0 && onResetTimer != null) ...[
-                      SizedBox(width: _s(12, 8)),
+                      SizedBox(width: _s(14, 8)),
                       GestureDetector(
                         onTap: onResetTimer,
                         child: Container(
-                          width: _s(22, 20),
-                          height: _s(22, 20),
+                          width: _s(28, 20),
+                          height: _s(28, 20),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
@@ -272,7 +278,7 @@ class TaskCard extends StatelessWidget {
                           ),
                           child: Icon(
                             Icons.replay,
-                            size: _s(13, 12),
+                            size: _s(16, 12),
                             color: MatrixTheme.primaryGreen.withValues(alpha: 0.7),
                           ),
                         ),
@@ -366,15 +372,14 @@ class _TimerDisplayState extends State<_TimerDisplay> {
     final totalSeconds = task.totalElapsedSeconds;
     return Text(
       _formatTime(totalSeconds),
-      style: TextStyle(
+      style: GoogleFonts.shareTechMono(
         color: task.isOngoing
             ? MatrixTheme.primaryGreen
             : MatrixTheme.primaryGreen.withValues(alpha: 0.6),
-        fontSize: _s(12, 10),
+        fontSize: _s(16, 10),
         fontWeight: FontWeight.bold,
-        fontFamily: 'monospace',
         shadows: task.isOngoing
-            ? MatrixTheme.glowShadow(blurRadius: _s(6))
+            ? MatrixTheme.glowShadow(blurRadius: _s(8))
             : null,
       ),
     );

@@ -40,7 +40,8 @@ hack-do includes peer-to-peer task syncing with zero configuration:
 | Gesture | Action |
 |---|---|
 | Tap **checkbox** (top-right circle) | Toggle complete |
-| Tap **X** button | Delete |
+| Tap **X** button (desktop only) | Delete |
+| **Long press** card | Delete confirmation |
 | Tap **play/pause** button | Start/stop timer |
 | Tap **reset** button | Reset timer to zero |
 
