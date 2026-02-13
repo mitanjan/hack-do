@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/task.dart';
 import '../theme/matrix_theme.dart';
 
-class TaskCard extends StatefulWidget {
+class TaskCard extends StatelessWidget {
   final Task task;
   final VoidCallback onTap;
   final VoidCallback onToggleComplete;
@@ -12,6 +12,7 @@ class TaskCard extends StatefulWidget {
   final VoidCallback? onResetTimer;
   final bool compact;
   final double scale;
+  final Stream<void>? tickStream;
 
   const TaskCard({
     super.key,
@@ -23,49 +24,46 @@ class TaskCard extends StatefulWidget {
     this.onResetTimer,
     this.compact = false,
     this.scale = 1.0,
+    this.tickStream,
   });
 
-  @override
-  State<TaskCard> createState() => _TaskCardState();
-}
+  static final _ongoingShadow = [
+    BoxShadow(
+      color: MatrixTheme.primaryGreen.withValues(alpha: 0.25),
+      blurRadius: 16,
+      spreadRadius: 2,
+    ),
+  ];
 
-class _TaskCardState extends State<TaskCard> {
-  Timer? _timer;
+  static final _idleShadow = [
+    BoxShadow(
+      color: MatrixTheme.primaryGreen.withValues(alpha: 0.05),
+      blurRadius: 10,
+      spreadRadius: 1,
+    ),
+  ];
 
-  @override
-  void initState() {
-    super.initState();
-    _startTimerIfNeeded();
-  }
+  static final _ongoingShadowCompact = [
+    BoxShadow(
+      color: MatrixTheme.primaryGreen.withValues(alpha: 0.25),
+      blurRadius: 12,
+      spreadRadius: 2,
+    ),
+  ];
 
-  @override
-  void didUpdateWidget(covariant TaskCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.task.isOngoing != oldWidget.task.isOngoing) {
-      _startTimerIfNeeded();
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTimerIfNeeded() {
-    _timer?.cancel();
-    if (widget.task.isOngoing) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-        setState(() {});
-      });
-    }
-  }
+  static final _idleShadowCompact = [
+    BoxShadow(
+      color: MatrixTheme.primaryGreen.withValues(alpha: 0.05),
+      blurRadius: 6,
+      spreadRadius: 1,
+    ),
+  ];
 
   Color get _cardColor =>
-      MatrixTheme.cardColors[widget.task.colorIndex % MatrixTheme.cardColors.length];
+      MatrixTheme.cardColors[task.colorIndex % MatrixTheme.cardColors.length];
 
   String get _priorityLabel {
-    switch (widget.task.priority) {
+    switch (task.priority) {
       case Priority.low:
         return 'LOW';
       case Priority.medium:
@@ -76,7 +74,7 @@ class _TaskCardState extends State<TaskCard> {
   }
 
   Color get _priorityColor {
-    switch (widget.task.priority) {
+    switch (task.priority) {
       case Priority.low:
         return MatrixTheme.dimGreen;
       case Priority.medium:
@@ -86,35 +84,17 @@ class _TaskCardState extends State<TaskCard> {
     }
   }
 
-  String _formatTime(int totalSeconds) {
-    final weeks = totalSeconds ~/ 604800;
-    final days = (totalSeconds % 604800) ~/ 86400;
-    final h = (totalSeconds % 86400) ~/ 3600;
-    final m = (totalSeconds % 3600) ~/ 60;
-    final s = totalSeconds % 60;
-    final hms = '${h.toString().padLeft(2, '0')}:'
-        '${m.toString().padLeft(2, '0')}:'
-        '${s.toString().padLeft(2, '0')}';
-    if (weeks > 0) return '${weeks}w ${days}d $hms';
-    if (days > 0) return '${days}d $hms';
-    return hms;
-  }
-
-  // Scale helper: returns value scaled by widget.scale, with compact override
+  // Scale helper: returns value scaled by scale, with compact override
   double _s(double normal, [double? compactVal]) {
-    if (widget.compact && compactVal != null) return compactVal * widget.scale;
-    return normal * widget.scale;
+    if (compact && compactVal != null) return compactVal * scale;
+    return normal * scale;
   }
 
   @override
   Widget build(BuildContext context) {
-    final task = widget.task;
-    final compact = widget.compact;
-    final totalSeconds = task.totalElapsedSeconds;
-
     return GestureDetector(
-      onTap: widget.onTap,
-      onLongPress: widget.onDelete,
+      onTap: onTap,
+      onLongPress: onDelete,
       child: Container(
         decoration: BoxDecoration(
           color: _cardColor,
@@ -124,15 +104,9 @@ class _TaskCardState extends State<TaskCard> {
                 ? MatrixTheme.primaryGreen.withValues(alpha: 0.5)
                 : MatrixTheme.primaryGreen.withValues(alpha: 0.15),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: task.isOngoing
-                  ? MatrixTheme.primaryGreen.withValues(alpha: 0.25)
-                  : MatrixTheme.primaryGreen.withValues(alpha: 0.05),
-              blurRadius: task.isOngoing ? _s(16, 12) : _s(10, 6),
-              spreadRadius: task.isOngoing ? _s(2) : _s(1),
-            ),
-          ],
+          boxShadow: task.isOngoing
+              ? (compact ? _ongoingShadowCompact : _ongoingShadow)
+              : (compact ? _idleShadowCompact : _idleShadow),
         ),
         child: Padding(
           padding: EdgeInsets.all(_s(12, 8)),
@@ -159,7 +133,7 @@ class _TaskCardState extends State<TaskCard> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: widget.onToggleComplete,
+                    onTap: onToggleComplete,
                     child: Container(
                       width: _s(20, 16),
                       height: _s(20, 16),
@@ -182,7 +156,7 @@ class _TaskCardState extends State<TaskCard> {
                   ),
                   SizedBox(width: _s(8, 4)),
                   GestureDetector(
-                    onTap: widget.onDelete,
+                    onTap: onDelete,
                     child: Icon(
                       Icons.close,
                       size: _s(16, 14),
@@ -244,23 +218,15 @@ class _TaskCardState extends State<TaskCard> {
                   ],
                 ],
               ),
-              if (widget.onToggleOngoing != null) ...[
+              if (onToggleOngoing != null) ...[
                 const Spacer(),
-                if (totalSeconds > 0 || task.isOngoing) ...[
+                if (task.totalElapsedSeconds > 0 || task.isOngoing) ...[
                   Center(
-                    child: Text(
-                      _formatTime(totalSeconds),
-                      style: TextStyle(
-                        color: task.isOngoing
-                            ? MatrixTheme.primaryGreen
-                            : MatrixTheme.primaryGreen.withValues(alpha: 0.6),
-                        fontSize: _s(12, 10),
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace',
-                        shadows: task.isOngoing
-                            ? MatrixTheme.glowShadow(blurRadius: _s(6))
-                            : null,
-                      ),
+                    child: _TimerDisplay(
+                      task: task,
+                      tickStream: tickStream,
+                      scale: scale,
+                      compact: compact,
                     ),
                   ),
                 ],
@@ -269,7 +235,7 @@ class _TaskCardState extends State<TaskCard> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     GestureDetector(
-                      onTap: widget.onToggleOngoing,
+                      onTap: onToggleOngoing,
                       child: Container(
                         width: _s(30, 24),
                         height: _s(30, 24),
@@ -290,10 +256,10 @@ class _TaskCardState extends State<TaskCard> {
                         ),
                       ),
                     ),
-                    if (totalSeconds > 0 && widget.onResetTimer != null) ...[
+                    if (task.totalElapsedSeconds > 0 && onResetTimer != null) ...[
                       SizedBox(width: _s(12, 8)),
                       GestureDetector(
-                        onTap: widget.onResetTimer,
+                        onTap: onResetTimer,
                         child: Container(
                           width: _s(22, 20),
                           height: _s(22, 20),
@@ -318,6 +284,98 @@ class _TaskCardState extends State<TaskCard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Tiny StatefulWidget that only rebuilds the timer text when the tick stream fires.
+class _TimerDisplay extends StatefulWidget {
+  final Task task;
+  final Stream<void>? tickStream;
+  final double scale;
+  final bool compact;
+
+  const _TimerDisplay({
+    required this.task,
+    required this.tickStream,
+    required this.scale,
+    required this.compact,
+  });
+
+  @override
+  State<_TimerDisplay> createState() => _TimerDisplayState();
+}
+
+class _TimerDisplayState extends State<_TimerDisplay> {
+  StreamSubscription<void>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribe();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TimerDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.tickStream != oldWidget.tickStream ||
+        widget.task.isOngoing != oldWidget.task.isOngoing) {
+      _sub?.cancel();
+      _sub = null;
+      _subscribe();
+    }
+  }
+
+  void _subscribe() {
+    if (widget.task.isOngoing && widget.tickStream != null) {
+      _sub = widget.tickStream!.listen((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  double _s(double normal, [double? compactVal]) {
+    if (widget.compact && compactVal != null) return compactVal * widget.scale;
+    return normal * widget.scale;
+  }
+
+  static String _formatTime(int totalSeconds) {
+    final weeks = totalSeconds ~/ 604800;
+    final days = (totalSeconds % 604800) ~/ 86400;
+    final h = (totalSeconds % 86400) ~/ 3600;
+    final m = (totalSeconds % 3600) ~/ 60;
+    final s = totalSeconds % 60;
+    final hms = '${h.toString().padLeft(2, '0')}:'
+        '${m.toString().padLeft(2, '0')}:'
+        '${s.toString().padLeft(2, '0')}';
+    if (weeks > 0) return '${weeks}w ${days}d $hms';
+    if (days > 0) return '${days}d $hms';
+    return hms;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final task = widget.task;
+    final totalSeconds = task.totalElapsedSeconds;
+    return Text(
+      _formatTime(totalSeconds),
+      style: TextStyle(
+        color: task.isOngoing
+            ? MatrixTheme.primaryGreen
+            : MatrixTheme.primaryGreen.withValues(alpha: 0.6),
+        fontSize: _s(12, 10),
+        fontWeight: FontWeight.bold,
+        fontFamily: 'monospace',
+        shadows: task.isOngoing
+            ? MatrixTheme.glowShadow(blurRadius: _s(6))
+            : null,
       ),
     );
   }

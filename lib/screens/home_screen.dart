@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/task.dart';
@@ -30,32 +31,45 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Task> _tasks = [];
   TaskFilter _filter = TaskFilter.all;
   final _random = Random();
-  int _peerCount = 0;
+
+  // Cached filtered list — recomputed only when _tasks or _filter changes
+  List<Task> _cachedFiltered = [];
+  List<Task>? _cachedFilterSource;
+  TaskFilter? _cachedFilterType;
+
+  // Single global tick stream for all timer displays
+  late final StreamController<void> _tickController;
+  late final Stream<void> _tickStream;
+  Timer? _tickTimer;
 
   @override
   void initState() {
     super.initState();
+    _tickController = StreamController<void>.broadcast();
+    _tickStream = _tickController.stream;
     _loadTasks();
-    widget.syncService.onPeersChanged = _onPeersChanged;
   }
 
   @override
   void dispose() {
-    widget.syncService.onPeersChanged = null;
+    _tickTimer?.cancel();
+    _tickController.close();
     super.dispose();
   }
 
-  void _onPeersChanged() {
-    if (mounted) {
-      setState(() {
-        _peerCount = widget.syncService.peers.length;
+  void _syncTickTimer() {
+    final hasOngoing = _tasks.any((t) => t.isOngoing);
+    if (hasOngoing && _tickTimer == null) {
+      _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _tickController.add(null);
       });
+    } else if (!hasOngoing && _tickTimer != null) {
+      _tickTimer!.cancel();
+      _tickTimer = null;
     }
   }
 
   void _openSyncScreen() {
-    // Detach our listener while sync screen is active
-    widget.syncService.onPeersChanged = null;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -65,9 +79,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     ).then((_) {
-      // Re-attach our listener
-      widget.syncService.onPeersChanged = _onPeersChanged;
-      _onPeersChanged();
       _loadTasks();
     });
   }
@@ -76,18 +87,27 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _tasks = widget.taskService.getAll()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      // Invalidate filter cache
+      _cachedFilterSource = null;
     });
+    _syncTickTimer();
   }
 
   List<Task> get _filteredTasks {
+    if (identical(_cachedFilterSource, _tasks) && _cachedFilterType == _filter) {
+      return _cachedFiltered;
+    }
+    _cachedFilterSource = _tasks;
+    _cachedFilterType = _filter;
     switch (_filter) {
       case TaskFilter.ongoing:
-        return _tasks.where((t) => t.isOngoing).toList();
+        _cachedFiltered = _tasks.where((t) => t.isOngoing).toList();
       case TaskFilter.done:
-        return _tasks.where((t) => t.isCompleted).toList();
+        _cachedFiltered = _tasks.where((t) => t.isCompleted).toList();
       case TaskFilter.all:
-        return _tasks;
+        _cachedFiltered = _tasks;
     }
+    return _cachedFiltered;
   }
 
   Future<void> _showTaskDialog({Task? task}) async {
@@ -248,39 +268,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.sync),
-                tooltip: 'Sync with nearby devices',
-                onPressed: _openSyncScreen,
-              ),
-              if (_peerCount > 0)
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: MatrixTheme.primaryGreen,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      '$_peerCount',
-                      style: const TextStyle(
-                        color: MatrixTheme.background,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
+          _SyncButton(
+            syncService: widget.syncService,
+            onPressed: _openSyncScreen,
           ),
           IconButton(
             icon: Icon(
@@ -297,6 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isDiagonalLayout
           ? DiagonalLayout(
               tasks: filtered,
+              tickStream: _tickStream,
               onTap: (t) => _showTaskDialog(task: t),
               onToggleComplete: _toggleComplete,
               onDelete: _confirmDelete,
@@ -305,6 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : TilingLayout(
               tasks: filtered,
+              tickStream: _tickStream,
               onTap: (t) => _showTaskDialog(task: t),
               onToggleComplete: _toggleComplete,
               onDelete: _confirmDelete,
@@ -316,6 +308,84 @@ class _HomeScreenState extends State<HomeScreen> {
         child: const Icon(Icons.add, size: 28),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+}
+
+/// Isolated widget that subscribes to peer changes independently,
+/// avoiding full HomeScreen rebuilds when peer count changes.
+class _SyncButton extends StatefulWidget {
+  final SyncService syncService;
+  final VoidCallback onPressed;
+
+  const _SyncButton({
+    required this.syncService,
+    required this.onPressed,
+  });
+
+  @override
+  State<_SyncButton> createState() => _SyncButtonState();
+}
+
+class _SyncButtonState extends State<_SyncButton> {
+  int _peerCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _peerCount = widget.syncService.peers.length;
+    widget.syncService.addPeersChangedListener(_onPeersChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.syncService.removePeersChangedListener(_onPeersChanged);
+    super.dispose();
+  }
+
+  void _onPeersChanged() {
+    if (mounted) {
+      setState(() {
+        _peerCount = widget.syncService.peers.length;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.sync),
+          tooltip: 'Sync with nearby devices',
+          onPressed: widget.onPressed,
+        ),
+        if (_peerCount > 0)
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: MatrixTheme.primaryGreen,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                '$_peerCount',
+                style: const TextStyle(
+                  color: MatrixTheme.background,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

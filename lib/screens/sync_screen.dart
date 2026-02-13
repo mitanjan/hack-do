@@ -38,14 +38,14 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     )..repeat(reverse: true);
 
     _peers = widget.syncService.peers;
-    widget.syncService.onPeersChanged = _onPeersChanged;
+    widget.syncService.addPeersChangedListener(_onPeersChanged);
   }
 
   @override
   void dispose() {
     _radarController.dispose();
     _pulseController.dispose();
-    widget.syncService.onPeersChanged = null;
+    widget.syncService.removePeersChangedListener(_onPeersChanged);
     super.dispose();
   }
 
@@ -428,6 +428,30 @@ class _RadarPainter extends CustomPainter {
   final double sweep;
   final int peerCount;
 
+  // Cached paint objects
+  static final _ringPaint = Paint()
+    ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.08)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1;
+
+  static final _crossPaint = Paint()
+    ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.05)
+    ..strokeWidth = 1;
+
+  static final _sweepLinePaint = Paint()
+    ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.3)
+    ..strokeWidth = 1.5;
+
+  static final _centerDotPaint = Paint()
+    ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.8);
+
+  static final _peerGlowPaint = Paint()
+    ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.15)
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+
+  static final _peerDotPaint = Paint()
+    ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.9);
+
   _RadarPainter({required this.sweep, required this.peerCount});
 
   @override
@@ -438,29 +462,19 @@ class _RadarPainter extends CustomPainter {
     // Concentric rings
     for (int i = 1; i <= 3; i++) {
       final r = maxRadius * i / 3;
-      canvas.drawCircle(
-        center,
-        r,
-        Paint()
-          ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.08)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1,
-      );
+      canvas.drawCircle(center, r, _ringPaint);
     }
 
     // Cross lines
-    final crossPaint = Paint()
-      ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.05)
-      ..strokeWidth = 1;
     canvas.drawLine(
       Offset(center.dx, center.dy - maxRadius),
       Offset(center.dx, center.dy + maxRadius),
-      crossPaint,
+      _crossPaint,
     );
     canvas.drawLine(
       Offset(center.dx - maxRadius, center.dy),
       Offset(center.dx + maxRadius, center.dy),
-      crossPaint,
+      _crossPaint,
     );
 
     // Sweep arc
@@ -482,20 +496,10 @@ class _RadarPainter extends CustomPainter {
       center.dx + maxRadius * cos(sweep),
       center.dy + maxRadius * sin(sweep),
     );
-    canvas.drawLine(
-      center,
-      lineEnd,
-      Paint()
-        ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.3)
-        ..strokeWidth = 1.5,
-    );
+    canvas.drawLine(center, lineEnd, _sweepLinePaint);
 
     // Center dot
-    canvas.drawCircle(
-      center,
-      4,
-      Paint()..color = MatrixTheme.primaryGreen.withValues(alpha: 0.8),
-    );
+    canvas.drawCircle(center, 4, _centerDotPaint);
 
     // Peer dots placed around the radar
     if (peerCount > 0) {
@@ -509,23 +513,14 @@ class _RadarPainter extends CustomPainter {
         );
 
         // Glow
-        canvas.drawCircle(
-          pos,
-          8,
-          Paint()
-            ..color = MatrixTheme.primaryGreen.withValues(alpha: 0.15)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-        );
+        canvas.drawCircle(pos, 8, _peerGlowPaint);
         // Dot
-        canvas.drawCircle(
-          pos,
-          3,
-          Paint()..color = MatrixTheme.primaryGreen.withValues(alpha: 0.9),
-        );
+        canvas.drawCircle(pos, 3, _peerDotPaint);
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _RadarPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _RadarPainter oldDelegate) =>
+      sweep != oldDelegate.sweep || peerCount != oldDelegate.peerCount;
 }

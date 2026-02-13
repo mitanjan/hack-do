@@ -89,8 +89,8 @@ class TaskService {
     task.save();
   }
 
-  Set<String> getDeletedIds() {
-    return _deletedBox.values.toSet();
+  List<String> getDeletedIds() {
+    return _deletedBox.values.toList();
   }
 
   List<Map<String, dynamic>> getAllAsJson() {
@@ -114,7 +114,7 @@ class TaskService {
       await _deletedBox.put(id, id);
     }
 
-    final localDeletedIds = getDeletedIds();
+    final localDeletedIds = getDeletedIds().toSet();
 
     for (final json in remoteTasks) {
       final remoteTask = Task.fromJson(json);

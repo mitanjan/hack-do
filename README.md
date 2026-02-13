@@ -21,6 +21,38 @@ hack-do includes peer-to-peer task syncing with zero configuration:
 - **Conflict resolution** — last-modified-wins merge strategy with soft-delete propagation
 - **No server required** — each instance runs an embedded HTTP server, all communication stays on your LAN
 
+## Gestures
+
+### Diagonal Layout (default)
+
+| Gesture | Action |
+|---|---|
+| **Tap** card | Reveal card to center + open edit dialog |
+| **Double-tap** card | Reveal/unreveal card without opening editor |
+| **Long press** card | Delete confirmation |
+| **Swipe left/right** | Navigate through card layers |
+| **Scroll wheel** (desktop) | Navigate through card layers |
+| **Right-click** (desktop) | Reveal/unreveal card |
+| **Tap empty area** | Dismiss revealed card |
+
+### On-card controls (both layouts)
+
+| Gesture | Action |
+|---|---|
+| Tap **checkbox** (top-right circle) | Toggle complete |
+| Tap **X** button | Delete |
+| Tap **play/pause** button | Start/stop timer |
+| Tap **reset** button | Reset timer to zero |
+
+### App bar
+
+| Gesture | Action |
+|---|---|
+| Tap **filter pill** (center) | Cycle: ALL → ONGOING → DONE |
+| Tap **sync icon** | Open sync screen |
+| Tap **layout icon** | Toggle diagonal ↔ tiling layout |
+| Tap **+** FAB | Create new task |
+
 ## Building
 
 ```sh

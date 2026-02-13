@@ -5,6 +5,7 @@ import 'task_card.dart';
 
 class TilingLayout extends StatelessWidget {
   final List<Task> tasks;
+  final Stream<void>? tickStream;
   final void Function(Task) onTap;
   final void Function(Task) onToggleComplete;
   final void Function(Task) onDelete;
@@ -19,6 +20,7 @@ class TilingLayout extends StatelessWidget {
     required this.onTap,
     required this.onToggleComplete,
     required this.onDelete,
+    this.tickStream,
     this.onToggleOngoing,
     this.onResetTimer,
   });
@@ -82,6 +84,7 @@ class TilingLayout extends StatelessWidget {
                           child: TaskCard(
                             task: task,
                             compact: cellW < 200 || cellH < 150,
+                            tickStream: tickStream,
                             onTap: () => onTap(task),
                             onToggleComplete: () => onToggleComplete(task),
                             onDelete: () => onDelete(task),

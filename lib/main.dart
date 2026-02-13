@@ -21,7 +21,11 @@ void main() async {
     taskService: taskService,
     deviceName: deviceName,
   );
-  await syncService.start();
+  try {
+    await syncService.start();
+  } catch (_) {
+    // Sync may fail on platforms with restricted networking — app still works
+  }
 
   runApp(HackDoApp(taskService: taskService, syncService: syncService));
 }

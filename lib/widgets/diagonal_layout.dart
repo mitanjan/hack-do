@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +6,7 @@ import 'task_card.dart';
 
 class DiagonalLayout extends StatefulWidget {
   final List<Task> tasks;
+  final Stream<void>? tickStream;
   final void Function(Task) onTap;
   final void Function(Task) onToggleComplete;
   final void Function(Task) onDelete;
@@ -19,6 +19,7 @@ class DiagonalLayout extends StatefulWidget {
     required this.onTap,
     required this.onToggleComplete,
     required this.onDelete,
+    this.tickStream,
     this.onToggleOngoing,
     this.onResetTimer,
   });
@@ -34,7 +35,6 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
   double _position = 0.0;
   late AnimationController _animController;
   late Animation<double> _animation;
-  Timer? _tickTimer;
   String? _revealedTaskId;
 
   // Reference dimensions (tuned for ~1500×800 window)
@@ -66,30 +66,10 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
     )..addListener(() {
         setState(() => _position = _animation.value);
       });
-    _syncTickTimer();
-  }
-
-  @override
-  void didUpdateWidget(covariant DiagonalLayout oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _syncTickTimer();
-  }
-
-  void _syncTickTimer() {
-    final hasOngoing = widget.tasks.any((t) => t.isOngoing);
-    if (hasOngoing && _tickTimer == null) {
-      _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() {});
-      });
-    } else if (!hasOngoing && _tickTimer != null) {
-      _tickTimer!.cancel();
-      _tickTimer = null;
-    }
   }
 
   @override
   void dispose() {
-    _tickTimer?.cancel();
     _animController.dispose();
     super.dispose();
   }
@@ -127,20 +107,21 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
       );
     }
 
-    // Newest first: index 0 = newest
-    final tasks = widget.tasks.reversed.toList();
-    final count = tasks.length;
+    final count = widget.tasks.length;
 
     final activeLayer = _position.floor().clamp(0, ((count / 4).ceil() - 1).clamp(0, count));
     final frac = _position - activeLayer;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Scale all dimensions proportionally to the window size
+        // Use mobile-tuned reference on narrow screens
+        final isMobile = constraints.maxWidth < 600;
+        final refW = isMobile ? 480.0 : _refWidth;
+        final refH = isMobile ? 900.0 : _refHeight;
         final scale = min(
-          constraints.maxWidth / _refWidth,
-          constraints.maxHeight / _refHeight,
-        ).clamp(0.4, 1.3);
+          constraints.maxWidth / refW,
+          constraints.maxHeight / refH,
+        ).clamp(isMobile ? 0.6 : 0.4, 1.3);
 
         final cardW = _refCardWidth * scale;
         final cardH = _refCardHeight * scale;
@@ -190,7 +171,7 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
               height: constraints.maxHeight,
               child: Stack(
                 clipBehavior: Clip.none,
-                children: _buildCards(tasks, count, activeLayer, frac,
+                children: _buildCards(widget.tasks, count, activeLayer, frac,
                     centerX, centerY, dims),
               ),
             ),
@@ -227,10 +208,12 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
     final widgets = <_CardEntry>[];
     final numLayers = (count / 4).ceil();
 
-    for (int i = 0; i < count; i++) {
+    // Iterate in reverse order (newest first) without allocating a new list
+    for (int ri = 0; ri < count; ri++) {
+      final i = count - 1 - ri;
       final task = tasks[i];
-      final quadrant = i % 4;
-      final layer = i ~/ 4;
+      final quadrant = ri % 4;
+      final layer = ri ~/ 4;
       final isLowerQuadrant = quadrant >= 2;
 
       double left;
@@ -313,9 +296,15 @@ class _DiagonalLayoutState extends State<DiagonalLayout>
           _revealedTaskId = _revealedTaskId == task.id ? null : task.id;
         });
       },
+      onDoubleTap: () {
+        setState(() {
+          _revealedTaskId = _revealedTaskId == task.id ? null : task.id;
+        });
+      },
       child: TaskCard(
         task: task,
         scale: scale,
+        tickStream: widget.tickStream,
         onTap: () {
           setState(() => _revealedTaskId = task.id);
           widget.onTap(task);

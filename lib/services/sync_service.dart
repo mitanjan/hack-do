@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'task_service.dart';
 
 class Peer {
@@ -44,21 +45,36 @@ class SyncService {
 
   HttpServer? _httpServer;
   RawDatagramSocket? _udpSocket;
-  Timer? _broadcastTimer;
-  Timer? _pruneTimer;
+  Timer? _maintainTimer;
+  late final HttpClient _httpClient;
 
   final Map<String, Peer> _peers = {};
   int _httpPort = 0;
 
   static const int _udpPort = 41234;
-  static const Duration _broadcastInterval = Duration(seconds: 3);
+  static const int _fixedHttpPort = 41234;
   static const Duration _peerTimeout = Duration(seconds: 15);
   static const String _magicPrefix = 'HACKDO';
 
-  void Function()? onPeersChanged;
+  final List<void Function()> _peersChangedListeners = [];
+
+  void addPeersChangedListener(void Function() listener) {
+    _peersChangedListeners.add(listener);
+  }
+
+  void removePeersChangedListener(void Function() listener) {
+    _peersChangedListeners.remove(listener);
+  }
+
+  void _notifyPeersChanged() {
+    for (final listener in _peersChangedListeners) {
+      listener();
+    }
+  }
 
   SyncService({required TaskService taskService, required this.deviceName})
-      : _taskService = taskService;
+      : _taskService = taskService,
+        _httpClient = HttpClient()..connectionTimeout = const Duration(seconds: 5);
 
   List<Peer> get peers => _peers.values.toList();
 
@@ -66,26 +82,37 @@ class SyncService {
 
   bool get isRunning => _httpServer != null;
 
+  static const _multicastChannel = MethodChannel('com.hackdo/multicast');
+
   Future<void> start() async {
+    if (Platform.isAndroid) {
+      try {
+        await _multicastChannel.invokeMethod('acquire');
+      } catch (_) {}
+    }
     await _cacheLocalIps();
     await _startHttpServer();
     await _startDiscovery();
   }
 
   Future<void> stop() async {
-    _broadcastTimer?.cancel();
-    _pruneTimer?.cancel();
+    _maintainTimer?.cancel();
     _udpSocket?.close();
     await _httpServer?.close();
     _httpServer = null;
     _udpSocket = null;
     _peers.clear();
+    if (Platform.isAndroid) {
+      try {
+        await _multicastChannel.invokeMethod('release');
+      } catch (_) {}
+    }
   }
 
   // --- HTTP Server ---
 
   Future<void> _startHttpServer() async {
-    _httpServer = await HttpServer.bind(InternetAddress.anyIPv4, 0);
+    _httpServer = await HttpServer.bind(InternetAddress.anyIPv4, _fixedHttpPort);
     _httpPort = _httpServer!.port;
 
     _httpServer!.listen((request) async {
@@ -112,7 +139,7 @@ class SyncService {
   Future<void> _handleGetTasks(HttpRequest request) async {
     final payload = {
       'tasks': _taskService.getAllAsJson(),
-      'deletedIds': _taskService.getDeletedIds().toList(),
+      'deletedIds': _taskService.getDeletedIds(),
       'deviceName': deviceName,
     };
     request.response
@@ -140,7 +167,7 @@ class SyncService {
     // Respond with our local data so the sender can merge too
     final payload = {
       'tasks': _taskService.getAllAsJson(),
-      'deletedIds': _taskService.getDeletedIds().toList(),
+      'deletedIds': _taskService.getDeletedIds(),
       'deviceName': deviceName,
       'added': added,
       'updated': updated,
@@ -181,15 +208,12 @@ class SyncService {
       }
     });
 
-    // Broadcast presence periodically
-    _broadcastTimer = Timer.periodic(_broadcastInterval, (_) => _broadcast());
+    // Single maintenance timer: broadcast + prune every 5 seconds
     _broadcast(); // Immediate first broadcast
-
-    // Prune stale peers
-    _pruneTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _pruneStalePeers(),
-    );
+    _maintainTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _broadcast();
+      _pruneStalePeers();
+    });
   }
 
   void _broadcast() {
@@ -229,7 +253,7 @@ class SyncService {
     );
 
     if (isNew) {
-      onPeersChanged?.call();
+      _notifyPeersChanged();
     }
   }
 
@@ -257,15 +281,10 @@ class SyncService {
 
   void _pruneStalePeers() {
     final now = DateTime.now();
-    final stale = _peers.entries
-        .where((e) => now.difference(e.value.lastSeen) > _peerTimeout)
-        .map((e) => e.key)
-        .toList();
-    if (stale.isNotEmpty) {
-      for (final key in stale) {
-        _peers.remove(key);
-      }
-      onPeersChanged?.call();
+    final sizeBefore = _peers.length;
+    _peers.removeWhere((_, peer) => now.difference(peer.lastSeen) > _peerTimeout);
+    if (_peers.length != sizeBefore) {
+      _notifyPeersChanged();
     }
   }
 
@@ -273,16 +292,13 @@ class SyncService {
 
   Future<SyncResult> syncWithPeer(Peer peer) async {
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 5);
-
       // POST our tasks to the peer
-      final request = await client.post(peer.ip, peer.port, '/sync');
+      final request = await _httpClient.post(peer.ip, peer.port, '/sync');
       request.headers.contentType = ContentType.json;
 
       final payload = {
         'tasks': _taskService.getAllAsJson(),
-        'deletedIds': _taskService.getDeletedIds().toList(),
+        'deletedIds': _taskService.getDeletedIds(),
       };
       request.write(jsonEncode(payload));
 
@@ -307,8 +323,6 @@ class SyncService {
       // Merge the response into our local store
       final (added, updated) =
           await _taskService.mergeTasks(remoteTasks, remoteDeletedIds);
-
-      client.close();
 
       return SyncResult(
         added: added,

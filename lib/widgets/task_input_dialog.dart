@@ -117,7 +117,7 @@ class _TaskInputDialogState extends State<TaskInputDialog> {
     );
   }
 
-  MarkdownStyleSheet get _markdownStyle => MarkdownStyleSheet(
+  late final MarkdownStyleSheet _markdownStyle = MarkdownStyleSheet(
         p: const TextStyle(color: MatrixTheme.primaryGreen, fontSize: 14),
         code: const TextStyle(
           color: MatrixTheme.primaryGreen,
